@@ -1,0 +1,130 @@
+
+	Thoughts about Wiley batch job processing
+
+
+Issues with current CPF-based implementation
+	Processing runs at arbitrary times, triggered by updates
+	Processing cannot be throttled
+	Processing cannot be prioritized
+	Does not scale well
+
+
+Alternate processing model
+
+	Timer tick drives all batch processing
+		controller script is run by timer
+		checks work queue for highest-priority job
+		picks highest-priority job
+		launches task if task slot is available
+		
+	Batch processing can be triggered/nudged on demand
+		When trigger runs
+		When UI action is taken
+
+
+Design
+	Batch controller script
+		called periodically, from timer or on demand
+		attempts to keep worker threads running
+		highest priority job goes next
+		How to make this cluster aware?
+		Configurable:
+			number of tasks to run concurrently
+			interval after which a job is considered dead
+			interval after which controller lock is stale
+			error handler job?  (pass batch-job and exception)
+			*** Need security info, which user/role to run jobs as
+				List of allowed users/roles?  Allow to specify in job control file?
+			*** Look into using function variables?
+			
+			<batch-config xmlns="urn://batch-master">
+				<enabled>true</enabled>
+				<max-concurrent-jobs>4</max-concurrent-jobs>
+				<job-stale-interval>T30M</job-stale-interval>
+				<controller-stale-interval>T2M</controller-stale-interval>
+				<error-handler-job>
+					...
+				</error-handler-job>
+			</batch-config>
+			<batch-controller-lock xmlns="urn://batch-master">
+				<version>1</version>
+				<timestamp>2010-07-30T12:23:34</timestamp>
+			</batch-controller-lock>
+			
+	Job runner script
+		spawned asynchronously by the batch controller script
+		takes a job control file as parameter
+		invokes named module with job control file as arg in separate transaction
+		records request id in job control file
+		return value of module:
+			<batch-job>: submit as new job, return arg to re-run
+			(): job is done, delete job control file
+			anything else: log?  What?
+			{exception}: log exception/notify and delete job control file
+		job control file is passed as arg, read-only
+
+	Job control file
+		must be in proper collection (urn://wiley-online-library/content/batch/job-queue)
+		contained information
+			module context (database, modules root, etc)
+			module URI to run
+			document URI to which job applies
+			priority
+			arbitrary options node
+		Notification options?
+		
+		<batch-job xmlns="urn://batch-master">
+			<name>Test Job 1</name>
+			<priority>100</priority>
+			<max-run-time>PT20M</max-run-time>
+			<created>2010-08-23T14:02:53.031209+01:00</created>
+			<module>/mybatch-job.xqy</module>
+			<context-database>{xdmp:database()}</context-database>
+			<modules-db>0</modules-db>
+			<modules-root>/modules</modules-root>
+			<document-uri>/mydocs/foo.xml</document-uri>
+			<user>bob</user>
+			<param>
+				<batch-size>25</batch-size>
+			</param>
+		</batch-job>
+
+	Options passed to job module
+		document URI
+		options node
+		other context?
+	
+	Workflow
+		job control file is created in job-queue collection
+			perhaps set collection trigger to tickle batch controller?
+		controller runs
+			check lock file, exit if still valid
+			set timestamped lock file
+			determine number of available open task slots (n)
+				Check that recorded request IDs are still running
+			for 1 to n
+				find highest priority job
+				move job doc to active collection (.../running-jobs)
+					set timestamp in job doc
+					change collections
+					commit in separate transaction
+				launch task
+			clear controller lock file (catch block)
+
+
+	Other
+		need scripts/UI to
+			clear job control files
+			adjust concurrent tasks
+			suspend/resume jobs
+			display active and queued jobs
+			change priority of jobs
+			display/send alerts of trouble
+			display stats of jobs/minute, by priority, etc
+
+
+
+
+
+
+
