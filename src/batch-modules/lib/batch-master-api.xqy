@@ -33,8 +33,8 @@ declare private function launch-job ($job as element(batch-job)) as empty-sequen
 declare private function clear-lock-and-respawn-if-needed() as empty-sequence()
 {
 	let $was-touched as xs:boolean := master-heartbeat-lock-was-touched()
-	let $dummy := clear-master-heartbeat-lock()
-	
+	let $_ := clear-master-heartbeat-lock()
+
 	return
 	if ($was-touched)
 	then xdmp:spawn ($bm-master-heartbeat-module, (), $bm:bm-spawn-options)

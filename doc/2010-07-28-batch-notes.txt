@@ -1,5 +1,5 @@
 
-	Thoughts about Wiley batch job processing
+	Design notes for Batch Master
 
 
 Issues with current CPF-based implementation
@@ -10,13 +10,12 @@ Issues with current CPF-based implementation
 
 
 Alternate processing model
-
 	Timer tick drives all batch processing
 		controller script is run by timer
 		checks work queue for highest-priority job
 		picks highest-priority job
 		launches task if task slot is available
-		
+
 	Batch processing can be triggered/nudged on demand
 		When trigger runs
 		When UI action is taken
@@ -36,7 +35,7 @@ Design
 			*** Need security info, which user/role to run jobs as
 				List of allowed users/roles?  Allow to specify in job control file?
 			*** Look into using function variables?
-			
+
 			<batch-config xmlns="urn://batch-master">
 				<enabled>true</enabled>
 				<max-concurrent-jobs>4</max-concurrent-jobs>
@@ -50,7 +49,7 @@ Design
 				<version>1</version>
 				<timestamp>2010-07-30T12:23:34</timestamp>
 			</batch-controller-lock>
-			
+
 	Job runner script
 		spawned asynchronously by the batch controller script
 		takes a job control file as parameter
@@ -64,7 +63,7 @@ Design
 		job control file is passed as arg, read-only
 
 	Job control file
-		must be in proper collection (urn://wiley-online-library/content/batch/job-queue)
+		must be in proper collection (urn:overstory:batchmaster:job-queue)
 		contained information
 			module context (database, modules root, etc)
 			module URI to run
@@ -72,7 +71,7 @@ Design
 			priority
 			arbitrary options node
 		Notification options?
-		
+
 		<batch-job xmlns="urn://batch-master">
 			<name>Test Job 1</name>
 			<priority>100</priority>
@@ -93,7 +92,7 @@ Design
 		document URI
 		options node
 		other context?
-	
+
 	Workflow
 		job control file is created in job-queue collection
 			perhaps set collection trigger to tickle batch controller?
@@ -110,6 +109,7 @@ Design
 					commit in separate transaction
 				launch task
 			clear controller lock file (catch block)
+			(detect over-running jobs and kill them?  Need to allow setting mac time in job spec)
 
 
 	Other
